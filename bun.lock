@@ -5,6 +5,7 @@
       "name": "mcp-bun-streamable-starter",
       "dependencies": {
         "@modelcontextprotocol/sdk": "latest",
+        "@the-ihor/mcp-sdk-typescript": "^0.0.1",
         "zod": "^4.1.11",
       },
       "devDependencies": {
@@ -15,6 +16,8 @@
   },
   "packages": {
     "@modelcontextprotocol/sdk": ["@modelcontextprotocol/sdk@1.18.2", "", { "dependencies": { "ajv": "^6.12.6", "content-type": "^1.0.5", "cors": "^2.8.5", "cross-spawn": "^7.0.5", "eventsource": "^3.0.2", "eventsource-parser": "^3.0.0", "express": "^5.0.1", "express-rate-limit": "^7.5.0", "pkce-challenge": "^5.0.0", "raw-body": "^3.0.0", "zod": "^3.23.8", "zod-to-json-schema": "^3.24.1" } }, "sha512-beedclIvFcCnPrYgHsylqiYJVJ/CI47Vyc4tY8no1/Li/O8U4BTlJfy6ZwxkYwx+Mx10nrgwSVrA7VBbhh4slg=="],
+
+    "@the-ihor/mcp-sdk-typescript": ["@the-ihor/mcp-sdk-typescript@0.0.1", "", { "dependencies": { "@modelcontextprotocol/sdk": "latest", "zod": "^4.1.11" } }, "sha512-bzx4h90Mp+0PmnvxkbkjrruzOERU5Lxb7j2MstZlY209AZcFPuwZZQ/hPEAU/BPsGET7ublWJQ5OEQsGN8J19A=="],
 
     "@types/bun": ["@types/bun@1.2.23", "", { "dependencies": { "bun-types": "1.2.23" } }, "sha512-le8ueOY5b6VKYf19xT3McVbXqLqmxzPXHsQT/q9JHgikJ2X22wyTW3g3ohz2ZMnp7dod6aduIiq8A14Xyimm0A=="],
 

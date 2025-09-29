@@ -1,197 +1,95 @@
 #!/usr/bin/env bun
 
-import { Server } from "@modelcontextprotocol/sdk/server/index.js";
-import {
-  CallToolRequestSchema,
-  ErrorCode,
-  ListToolsRequestSchema,
-  McpError,
-} from "@modelcontextprotocol/sdk/types.js";
-import { StreamableHttpTransport } from "./transport.js";
-import {
-  EchoSchema,
-  ReverseSchema,
-  CalculatorSchema,
-  zodToJsonSchema,
-  createToolHandler,
-} from "./schemas.js";
-
-const server = new Server(
-  {
-    name: "mcp-bun-streamable-starter",
-    version: "1.0.0",
-  },
-  {
-    capabilities: {
-      // Tools: Enable when your server performs actions/operations (not just data retrieval)
-      // ✅ Use for: API calls, file operations, calculations, external integrations
-      // ❌ Disable for: Read-only servers, static data providers
-      tools: {}
-
-      // Resources: Enable when serving data, documents, or content to clients
-      // ✅ Use for: File access, database queries, configuration data
-      // ❌ Disable for: Action-only servers with no data exposure
-      // resources: {
-      //   supported: true,
-      //
-      //   // Subscriptions: Enable when resources change over time and clients need updates
-      //   // ✅ Use for: Live logs, real-time metrics, file monitoring
-      //   // ❌ Disable for: Static resources, rarely changing data
-      //   subscriptions: false
-      // },
-
-      // Prompts: Enable when providing domain-specific templates for common tasks
-      // ✅ Use for: Code generation templates, report builders, guided workflows
-      // ❌ Disable for: Simple services, when users always provide custom inputs
-      // prompts: {
-      //   supported: false
-      // },
-
-      // Sampling: Enable when your server needs to generate natural language
-      // ✅ Use for: Content generation, summarization, AI-powered responses
-      // ❌ Disable for: Structured data only, when intelligence stays client-side
-      // sampling: {
-      //   supported: false
-      // }
-    },
-  }
-);
-
-// Create validated tool handlers
-const echoHandler = createToolHandler(EchoSchema, async (args) => {
-  return {
-    content: [
-      {
-        type: "text",
-        text: `Echo: ${args.text}`,
-      },
-    ],
-  };
-});
-
-const reverseHandler = createToolHandler(ReverseSchema, async (args) => {
-  return {
-    content: [
-      {
-        type: "text",
-        text: `Reversed: ${args.text.split("").reverse().join("")}`,
-      },
-    ],
-  };
-});
-
-const calculatorHandler = createToolHandler(CalculatorSchema, async (args) => {
-  let result: number;
-
-  switch (args.operation) {
-    case "add":
-      result = args.a + args.b;
-      break;
-    case "subtract":
-      result = args.a - args.b;
-      break;
-    case "multiply":
-      result = args.a * args.b;
-      break;
-    case "divide":
-      if (args.b === 0) {
-        throw new McpError(ErrorCode.InvalidParams, "Division by zero is not allowed");
-      }
-      result = args.a / args.b;
-      break;
-    default:
-      throw new McpError(ErrorCode.InvalidParams, `Unknown operation: ${args.operation}`);
-  }
-
-  return {
-    content: [
-      {
-        type: "text",
-        text: `${args.a} ${args.operation} ${args.b} = ${result}`,
-      },
-    ],
-  };
-});
-
-server.setRequestHandler(ListToolsRequestSchema, async () => {
-  return {
-    tools: [
-      {
-        name: "echo",
-        description: "Echo back the input text",
-        inputSchema: zodToJsonSchema(EchoSchema),
-      },
-      {
-        name: "reverse",
-        description: "Reverse the input text",
-        inputSchema: zodToJsonSchema(ReverseSchema),
-      },
-      {
-        name: "calculator",
-        description: "Perform basic mathematical operations",
-        inputSchema: zodToJsonSchema(CalculatorSchema),
-      },
-    ],
-  };
-});
-
-server.setRequestHandler(CallToolRequestSchema, async (request) => {
-  const { name, arguments: args } = request.params;
-
-  try {
-    switch (name) {
-      case "echo":
-        return await echoHandler(args);
-
-      case "reverse":
-        return await reverseHandler(args);
-
-      case "calculator":
-        return await calculatorHandler(args);
-
-      default:
-        throw new McpError(
-          ErrorCode.MethodNotFound,
-          `Unknown tool: ${name}`
-        );
-    }
-  } catch (error) {
-    if (error instanceof McpError) {
-      throw error;
-    }
-
-    // Handle Zod validation errors
-    if (error && typeof error === "object" && "issues" in error) {
-      const zodError = error as any;
-      const issues = zodError.issues.map((issue: any) =>
-        `${issue.path.join(".")}: ${issue.message}`
-      ).join(", ");
-
-      throw new McpError(
-        ErrorCode.InvalidParams,
-        `Validation error: ${issues}`
-      );
-    }
-
-    throw new McpError(
-      ErrorCode.InternalError,
-      `Tool execution failed: ${error}`
-    );
-  }
-});
+import { z, MCPApp, TextResponse, ProgressResponse, LogResponse, RawResponse } from "@the-ihor/mcp-sdk-typescript";
 
 async function main() {
-  const port = process.env.PORT ? parseInt(process.env.PORT) : 3000;
-  const host = process.env.HOST || "localhost";
-
-  const transport = new StreamableHttpTransport({
-    host,
-    port,
-    path: "/mcp",
+  const app = new MCPApp({
+    name: "mcp-generator-server",
+    version: "1.0.0",
+    transport: {
+      host: process.env.HOST || "localhost",
+      port: process.env.PORT ? parseInt(process.env.PORT) : 3000,
+      path: "/mcp"
+    }
   });
 
-  await server.connect(transport);
-  console.log(`MCP Streamable HTTP server running on http://${host}:${port}/mcp`);
+  // Create tools with generator handlers and response classes
+  app
+    .createTool({
+      name: "echo",
+      description: "Echo back the input text",
+      schema: z.object({
+        text: z.string().describe("Text to echo back"),
+        uppercase: z.boolean().optional().describe("Convert to uppercase")
+      }),
+      handler: async function* (args) {
+        // Generator function with yield
+        yield new LogResponse("Starting echo operation", "info");
+        
+        const result = args.uppercase ? args.text.toUpperCase() : args.text;
+        yield new TextResponse(`Echo: ${result}`);
+      }
+    })
+    .createTool({
+      name: "calculator",
+      description: "Perform basic mathematical operations",
+      schema: z.object({
+        operation: z.enum(["add", "subtract", "multiply", "divide"]).describe("Mathematical operation"),
+        a: z.number().describe("First number"),
+        b: z.number().describe("Second number")
+      }),
+      handler: async function* (args) {
+        yield new LogResponse(`Calculating ${args.a} ${args.operation} ${args.b}`, "info");
+        
+        let result: number;
+        switch (args.operation) {
+          case "add":
+            result = args.a + args.b;
+            break;
+          case "subtract":
+            result = args.a - args.b;
+            break;
+          case "multiply":
+            result = args.a * args.b;
+            break;
+          case "divide":
+            if (args.b === 0) {
+              throw new Error("Division by zero is not allowed");
+            }
+            result = args.a / args.b;
+            break;
+        }
+        
+        yield new TextResponse(`${args.a} ${args.operation} ${args.b} = ${result}`);
+      }
+    })
+    .createTool({
+      name: "long_process",
+      description: "Simulate a long-running process with progress updates",
+      schema: z.object({
+        steps: z.number().min(1).max(10).default(5).describe("Number of steps to simulate"),
+        delay: z.number().min(100).max(2000).default(500).describe("Delay between steps in ms")
+      }),
+      handler: async function* (args) {
+        yield new LogResponse("Starting long process", "info");
+        
+        for (let i = 1; i <= args.steps; i++) {
+          yield new ProgressResponse(`Step ${i} of ${args.steps}`, i, args.steps);
+          
+          // Simulate work
+          await new Promise(resolve => setTimeout(resolve, args.delay));
+        }
+        
+        yield new TextResponse("Process completed successfully!");
+        yield new RawResponse({
+          type: "result",
+          totalSteps: args.steps,
+          totalTime: args.steps * args.delay
+        });
+      }
+    });
+
+  await app.start();
 }
 
 main().catch((error) => {
