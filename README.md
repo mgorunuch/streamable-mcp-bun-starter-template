@@ -40,10 +40,11 @@ The server will start on `http://localhost:3000/mcp` by default.
 
 ### Basic Example
 
-The starter includes two example tools:
+The starter includes three example tools with Zod validation:
 
 - `echo`: Returns the input text
-- `reverse`: Reverses the input text
+- `reverse`: Reverses the input text  
+- `calculator`: Performs mathematical operations (add, subtract, multiply, divide)
 
 ### Testing the Server
 
@@ -76,6 +77,42 @@ curl -X POST http://localhost:3000/mcp \
     }
   }'
 
+# Call the calculator tool (new Zod-validated tool)
+curl -X POST http://localhost:3000/mcp \
+  -H "Content-Type: application/json" \
+  -H "MCP-Protocol-Version: 2025-03-26" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": 3,
+    "method": "tools/call",
+    "params": {
+      "name": "calculator",
+      "arguments": {
+        "operation": "add",
+        "a": 15,
+        "b": 25
+      }
+    }
+  }'
+
+# Test validation error (invalid operation)
+curl -X POST http://localhost:3000/mcp \
+  -H "Content-Type: application/json" \
+  -H "MCP-Protocol-Version: 2025-03-26" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": 4,
+    "method": "tools/call",
+    "params": {
+      "name": "calculator",
+      "arguments": {
+        "operation": "invalid",
+        "a": 10,
+        "b": 5
+      }
+    }
+  }'
+
 # Open SSE stream for real-time messages
 curl -N http://localhost:3000/mcp \
   -H "Accept: text/event-stream" \
@@ -86,12 +123,13 @@ curl -N http://localhost:3000/mcp \
 
 ```
 ├── src/
-│   ├── index.ts          # Main server entry point
-│   └── transport.ts      # Streamable HTTP transport implementation
+│   ├── index.ts          # Main server entry point with example tools
+│   ├── transport.ts      # Streamable HTTP transport implementation
+│   └── schemas.ts        # Zod schemas and validation utilities
 ├── dist/                 # Compiled output (after build)
-├── package.json
-├── tsconfig.json
-└── README.md
+├── package.json          # Dependencies including Zod
+├── tsconfig.json         # TypeScript configuration
+└── README.md             # This documentation
 ```
 
 ## MCP Streamable HTTP Transport
@@ -159,45 +197,95 @@ Currently **disabled** - uncomment to enable AI/LLM capabilities.
 
 ## Customization
 
-### Adding New Tools
+### Adding New Tools with Zod Validation
 
-Add new tools in `src/index.ts`:
+This starter template uses [Zod](https://zod.dev/) for robust schema validation and automatic JSON Schema generation.
+
+#### 1. Define Your Schema in `src/schemas.ts`:
 
 ```typescript
-server.setRequestHandler(ListToolsRequestSchema, async () => {
+import { z } from "zod";
+
+export const YourToolSchema = z.object({
+  param1: z.string().describe("Description of param1"),
+  param2: z.number().optional().describe("Optional numeric parameter"),
+  operation: z.enum(["create", "update", "delete"]).describe("Operation type"),
+});
+
+export type YourToolArgs = z.infer<typeof YourToolSchema>;
+```
+
+#### 2. Create a Tool Handler in `src/index.ts`:
+
+```typescript
+import { YourToolSchema, type YourToolArgs } from "./schemas.js";
+
+const yourToolHandler = createToolHandler(YourToolSchema, async (args: YourToolArgs) => {
+  // args are automatically validated and typed!
   return {
-    tools: [
-      // ... existing tools
+    content: [
       {
-        name: "your-tool",
-        description: "Description of your tool",
-        inputSchema: {
-          type: "object",
-          properties: {
-            // Define your tool's parameters
-          },
-          required: ["param1"],
-        },
+        type: "text",
+        text: `Processing ${args.operation} with ${args.param1}`,
       },
     ],
   };
 });
+```
 
-server.setRequestHandler(CallToolRequestSchema, async (request) => {
-  const { name, arguments: args } = request.params;
+#### 3. Register the Tool:
 
-  switch (name) {
-    // ... existing cases
-    case "your-tool":
-      return {
-        content: [
-          {
-            type: "text",
-            text: "Your tool's response",
-          },
-        ],
-      };
-  }
+```typescript
+// Add to ListToolsRequestSchema handler
+{
+  name: "your-tool",
+  description: "Description of your tool",
+  inputSchema: zodToJsonSchema(YourToolSchema),
+}
+
+// Add to CallToolRequestSchema handler
+case "your-tool":
+  return await yourToolHandler(args);
+```
+
+#### Benefits of Zod Integration:
+
+- ✅ **Automatic Validation**: Input arguments are validated before reaching your handler
+- ✅ **Type Safety**: Full TypeScript support with inferred types
+- ✅ **JSON Schema Generation**: Automatic conversion from Zod to MCP-compatible schemas
+- ✅ **Rich Validation**: Support for complex validation rules, optional fields, enums, etc.
+- ✅ **Better Error Messages**: Detailed validation errors for debugging
+
+#### Example Tools Included:
+
+1. **Echo Tool**: Simple string input/output
+2. **Reverse Tool**: String manipulation
+3. **Calculator Tool**: Mathematical operations with enums and validation
+
+#### Advanced Schema Examples:
+
+```typescript
+// Complex nested object
+const DatabaseQuerySchema = z.object({
+  table: z.string().min(1).describe("Database table name"),
+  filters: z.record(z.any()).optional().describe("Query filters"),
+  limit: z.number().min(1).max(1000).default(10).describe("Result limit"),
+  orderBy: z.enum(["asc", "desc"]).default("asc").describe("Sort order"),
+});
+
+// Array with validation
+const BulkProcessSchema = z.object({
+  items: z.array(z.string().min(1)).min(1).max(100).describe("Items to process"),
+  batchSize: z.number().min(1).max(50).default(10).describe("Batch size"),
+});
+
+// Union types for flexible inputs
+const FlexibleInputSchema = z.object({
+  data: z.union([
+    z.string().describe("Text input"),
+    z.number().describe("Numeric input"),
+    z.object({ id: z.string(), value: z.any() }).describe("Object input")
+  ]).describe("Flexible input data"),
 });
 ```
 

@@ -8,6 +8,13 @@ import {
   McpError,
 } from "@modelcontextprotocol/sdk/types.js";
 import { StreamableHttpTransport } from "./transport.js";
+import {
+  EchoSchema,
+  ReverseSchema,
+  CalculatorSchema,
+  zodToJsonSchema,
+  createToolHandler,
+} from "./schemas.js";
 
 const server = new Server(
   {
@@ -19,9 +26,7 @@ const server = new Server(
       // Tools: Enable when your server performs actions/operations (not just data retrieval)
       // ✅ Use for: API calls, file operations, calculations, external integrations
       // ❌ Disable for: Read-only servers, static data providers
-      // tools: {
-      //   supported: false
-      // }
+      tools: {}
 
       // Resources: Enable when serving data, documents, or content to clients
       // ✅ Use for: File access, database queries, configuration data
@@ -52,36 +57,79 @@ const server = new Server(
   }
 );
 
+// Create validated tool handlers
+const echoHandler = createToolHandler(EchoSchema, async (args) => {
+  return {
+    content: [
+      {
+        type: "text",
+        text: `Echo: ${args.text}`,
+      },
+    ],
+  };
+});
+
+const reverseHandler = createToolHandler(ReverseSchema, async (args) => {
+  return {
+    content: [
+      {
+        type: "text",
+        text: `Reversed: ${args.text.split("").reverse().join("")}`,
+      },
+    ],
+  };
+});
+
+const calculatorHandler = createToolHandler(CalculatorSchema, async (args) => {
+  let result: number;
+
+  switch (args.operation) {
+    case "add":
+      result = args.a + args.b;
+      break;
+    case "subtract":
+      result = args.a - args.b;
+      break;
+    case "multiply":
+      result = args.a * args.b;
+      break;
+    case "divide":
+      if (args.b === 0) {
+        throw new McpError(ErrorCode.InvalidParams, "Division by zero is not allowed");
+      }
+      result = args.a / args.b;
+      break;
+    default:
+      throw new McpError(ErrorCode.InvalidParams, `Unknown operation: ${args.operation}`);
+  }
+
+  return {
+    content: [
+      {
+        type: "text",
+        text: `${args.a} ${args.operation} ${args.b} = ${result}`,
+      },
+    ],
+  };
+});
+
 server.setRequestHandler(ListToolsRequestSchema, async () => {
   return {
     tools: [
       {
         name: "echo",
         description: "Echo back the input text",
-        inputSchema: {
-          type: "object",
-          properties: {
-            text: {
-              type: "string",
-              description: "Text to echo back",
-            },
-          },
-          required: ["text"],
-        },
+        inputSchema: zodToJsonSchema(EchoSchema),
       },
       {
         name: "reverse",
         description: "Reverse the input text",
-        inputSchema: {
-          type: "object",
-          properties: {
-            text: {
-              type: "string",
-              description: "Text to reverse",
-            },
-          },
-          required: ["text"],
-        },
+        inputSchema: zodToJsonSchema(ReverseSchema),
+      },
+      {
+        name: "calculator",
+        description: "Perform basic mathematical operations",
+        inputSchema: zodToJsonSchema(CalculatorSchema),
       },
     ],
   };
@@ -90,36 +138,45 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
 
-  if (!args) {
-    throw new McpError(ErrorCode.InvalidParams, "Missing arguments");
-  }
+  try {
+    switch (name) {
+      case "echo":
+        return await echoHandler(args);
 
-  switch (name) {
-    case "echo":
-      return {
-        content: [
-          {
-            type: "text",
-            text: `Echo: ${args.text}`,
-          },
-        ],
-      };
+      case "reverse":
+        return await reverseHandler(args);
 
-    case "reverse":
-      return {
-        content: [
-          {
-            type: "text",
-            text: `Reversed: ${String(args.text).split("").reverse().join("")}`,
-          },
-        ],
-      };
+      case "calculator":
+        return await calculatorHandler(args);
 
-    default:
+      default:
+        throw new McpError(
+          ErrorCode.MethodNotFound,
+          `Unknown tool: ${name}`
+        );
+    }
+  } catch (error) {
+    if (error instanceof McpError) {
+      throw error;
+    }
+
+    // Handle Zod validation errors
+    if (error && typeof error === "object" && "issues" in error) {
+      const zodError = error as any;
+      const issues = zodError.issues.map((issue: any) =>
+        `${issue.path.join(".")}: ${issue.message}`
+      ).join(", ");
+
       throw new McpError(
-        ErrorCode.MethodNotFound,
-        `Unknown tool: ${name}`
+        ErrorCode.InvalidParams,
+        `Validation error: ${issues}`
       );
+    }
+
+    throw new McpError(
+      ErrorCode.InternalError,
+      `Tool execution failed: ${error}`
+    );
   }
 });
 
