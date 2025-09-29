@@ -19,14 +19,16 @@ const server = new Server(
       // Tools: Enable when your server performs actions/operations (not just data retrieval)
       // ✅ Use for: API calls, file operations, calculations, external integrations
       // ❌ Disable for: Read-only servers, static data providers
-      tools: {},
+      // tools: {
+      //   supported: false
+      // }
 
       // Resources: Enable when serving data, documents, or content to clients
       // ✅ Use for: File access, database queries, configuration data
       // ❌ Disable for: Action-only servers with no data exposure
       // resources: {
       //   supported: true,
-      //   
+      //
       //   // Subscriptions: Enable when resources change over time and clients need updates
       //   // ✅ Use for: Live logs, real-time metrics, file monitoring
       //   // ❌ Disable for: Static resources, rarely changing data
