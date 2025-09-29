@@ -16,7 +16,36 @@ const server = new Server(
   },
   {
     capabilities: {
+      // Tools: Enable when your server performs actions/operations (not just data retrieval)
+      // ✅ Use for: API calls, file operations, calculations, external integrations
+      // ❌ Disable for: Read-only servers, static data providers
       tools: {},
+
+      // Resources: Enable when serving data, documents, or content to clients
+      // ✅ Use for: File access, database queries, configuration data
+      // ❌ Disable for: Action-only servers with no data exposure
+      // resources: {
+      //   supported: true,
+      //   
+      //   // Subscriptions: Enable when resources change over time and clients need updates
+      //   // ✅ Use for: Live logs, real-time metrics, file monitoring
+      //   // ❌ Disable for: Static resources, rarely changing data
+      //   subscriptions: false
+      // },
+
+      // Prompts: Enable when providing domain-specific templates for common tasks
+      // ✅ Use for: Code generation templates, report builders, guided workflows
+      // ❌ Disable for: Simple services, when users always provide custom inputs
+      // prompts: {
+      //   supported: false
+      // },
+
+      // Sampling: Enable when your server needs to generate natural language
+      // ✅ Use for: Content generation, summarization, AI-powered responses
+      // ❌ Disable for: Structured data only, when intelligence stays client-side
+      // sampling: {
+      //   supported: false
+      // }
     },
   }
 );

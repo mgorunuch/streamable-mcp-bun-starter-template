@@ -113,6 +113,50 @@ This implementation follows the [MCP Streamable HTTP Transport specification](ht
 - JSON-RPC encoded messages in UTF-8
 - Single endpoint path (`/mcp` by default)
 
+## MCP Capabilities Configuration
+
+The server's capabilities determine what features are available to MCP clients. Configure them in `src/index.ts`:
+
+### **Tools** (`tools: {}`)
+Currently **enabled** - allows clients to call functions that perform actions.
+
+**Enable when:**
+- ✅ Your server performs actions/operations (API calls, file operations, calculations)
+- ✅ You need to execute functions with side effects
+- ✅ You provide computational services
+
+**Disable when:**
+- ❌ Your server only provides static data
+- ❌ You only need read-only access to resources
+
+### **Resources** (`resources: { supported: true, subscriptions: false }`)
+Currently **disabled** - uncomment to enable data/content serving.
+
+**Enable when:**
+- ✅ You serve data, documents, or content to clients
+- ✅ You provide access to files, configurations, or databases
+- ✅ You need to expose structured information
+
+**Enable subscriptions when:**
+- ✅ Your resources change over time and clients need updates
+- ✅ You support real-time data monitoring
+
+### **Prompts** (`prompts: { supported: true }`)
+Currently **disabled** - uncomment to enable template workflows.
+
+**Enable when:**
+- ✅ You provide domain-specific templates for common tasks
+- ✅ You want to standardize user interactions
+- ✅ You have complex workflows that benefit from guidance
+
+### **Sampling** (`sampling: { supported: true }`)
+Currently **disabled** - uncomment to enable AI/LLM capabilities.
+
+**Enable when:**
+- ✅ Your server needs to generate natural language
+- ✅ You require AI/LLM capabilities within your server logic
+- ✅ You need to process or transform text intelligently
+
 ## Customization
 
 ### Adding New Tools
